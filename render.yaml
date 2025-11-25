@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: moveme-backend
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "node server.js"
+    envVars:
+      - key: DB_HOST
+        value: "<seu_host_neon>"
+      - key: DB_USER
+        value: "<seu_usuario_neon>"
+      - key: DB_PASSWORD
+        value: "<sua_senha_neon>"
+      - key: DB_NAME
+        value: "<seu_db_neon>"
