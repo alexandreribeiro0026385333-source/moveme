@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Motora - Corridas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body { font-family: Arial; margin:0; padding:0; }
+    #map { height: 50vh; width: 100%; }
+    .container { padding: 20px; max-width: 400px; margin:auto; }
+    .corrida { border:1px solid #ccc; padding:10px; margin:10px 0; border-radius:4px; }
+    button { width:48%; padding:10px; margin:4px 1%; border:none; border-radius:4px; cursor:pointer; }
+    .pagar { background:#28a745; color:#fff; }
+    .terminar { background:#007bff; color:#fff; }
+    .pagar:hover { background:#218838; }
+    .terminar:hover { background:#0056b3; }
+    #msg { text-align:center; margin-top:10px; color:#333; }
+    #qrcode { text-align:center; margin:10px 0; }
+    #login { max-width:300px; margin:20px auto; padding:20px; border-radius:8px; background:#f4f4f4; }
+    #login input, #login button { width:100%; padding:10px; margin:8px 0; border-radius:4px; border:1px solid #ccc; }
+    #login button { background:#007bff; color:#fff; border:none; cursor:pointer; }
+    #login button:hover { background:#0056b3; }
+  </style>
+</head>
+<body>
+  <div id="login">
+    <h2>Login Motorista</h2>
+    <input type="text" id="senha" placeholder="Senha (placa Mercosul)" required>
+    <button onclick="login()">Entrar</button>
+    <p id="msgLogin"></p>
+  </div>
+
+  <div class="container" style="display:none;" id="dashboard">
+    <h2>Corridas Motorista</h2>
+    <div id="corridasList"></div>
+    <p id="msg"></p>
+    <div id="qrcode"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
+  <script>
+    let motoristaId = null;
+    let map, motoristaMarker;
+
+    function login(){
+      const senha = document.getElementById('senha').value;
+      const msgLogin = document.getElementById('msgLogin');
+      fetch('https://<SEU_BACKEND_RENDER>/login/motora', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ senha })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.ok){
+          motoristaId = data.motorista.id;
+          document.getElementById('login').style.display='none';
+          document.getElementById('dashboard').style.display='block';
+          iniciarMapa(data.motorista.latitude, data.motorista.longitude);
+          carregarCorridas();
+        } else {
+          msgLogin.textContent = 'Senha incorreta';
+        }
+      })
+      .catch(()=>{ msgLogin.textContent='Erro de conexão'; });
+    }
+
+    function iniciarMapa(lat=-22.5, lng=-43.5){
+      map = L.map('map').setView([lat, lng], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OSM' }).addTo(map);
+      motoristaMarker = L.marker([lat, lng]).addTo(map).bindPopup('Você está aqui');
+    }
+
+    function calcularDistancia(lat1, lng1, lat2, lng2){
+      const R = 6371;
+      const dLat = (lat2-lat1)*Math.PI/180;
+      const dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return (R*c).toFixed(2);
+    }
+
+    async function carregarCorridas(){
+      const corridasList = document.getElementById('corridasList');
+      corridasList.innerHTML='';
+      try{
+        const res = await fetch(`https://<SEU_BACKEND_RENDER>/corridas/motora/${motoristaId}`);
+        const data = await res.json();
+        data.forEach(c => {
+          const div = document.createElement('div');
+          div.className='corrida';
+          div.innerHTML=`
+            <strong>Passageiro:</strong> ${c.passageiro_nome}<br>
+            <strong>Origem:</strong> ${c.origem_lat}, ${c.origem_lng}<br>
+            <strong>Destino:</strong> ${c.destino_lat}, ${c.destino_lng}<br>
+            <strong>Distância:</strong> ${calcularDistancia(c.origem_lat, c.origem_lng, c.destino_lat, c.destino_lng)} km<br>
+            <strong>Valor:</strong> R$ ${c.valor}<br>
+            <strong>Modo:</strong> ${c.modo_pagamento}<br>
+            <button class="pagar" onclick="marcarPago(${c.id})">Marcar como pago</button>
+            <button class="terminar" onclick="terminarCorrida(${c.id})">Terminar corrida</button>
+          `;
+          corridasList.appendChild(div);
+
+          L.marker([c.origem_lat, c.origem_lng]).addTo(map).bindPopup('Origem: '+c.passageiro_nome);
+          L.marker([c.destino_lat, c.destino_lng]).addTo(map).bindPopup('Destino');
+        });
+      } catch(err){ document.getElementById('msg').textContent='Erro ao carregar corridas'; }
+    }
+
+    async function marcarPago(id){
+      try{
+        const res = await fetch(`https://<SEU_BACKEND_RENDER>/corridas/pago/${id}`, { method:'POST' });
+        if(res.ok){ document.getElementById('msg').textContent='Corrida marcada como paga'; carregarCorridas(); }
+      } catch{ document.getElementById('msg').textContent='Erro de conexão'; }
+    }
+
+    async function terminarCorrida(id){
+      try{
+        const res = await fetch(`https://<SEU_BACKEND_RENDER>/corridas/terminar/${id}`, { method:'POST' });
+        if(res.ok){ document.getElementById('msg').textContent='Corrida concluída'; carregarCorridas(); }
+      } catch{ document.getElementById('msg').textContent='Erro de conexão'; }
+    }
+
+    QRCode.toCanvas(document.getElementById('qrcode'), '00020126390014br.gov.bcb.pix01171680way@gmail.com5204000053039865802BR5917ALEXANDRE RIBEIRO6011NOVA IGUACU62580520SAN2025112512210834550300017br.gov.bcb.brcode01051.0.06304A9C8', { width:200 });
+  </script>
+</body>
+</html>
