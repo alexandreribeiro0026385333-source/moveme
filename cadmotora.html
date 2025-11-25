@@ -36,13 +36,18 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const data = {
-        nome: document.getElementById('nome').value.trim(),
-        telefone: document.getElementById('telefone').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        senha: document.getElementById('senha').value.trim(),
-        placa: document.getElementById('senha').value.trim() // senha = placa
-      };
+
+const data = {
+  nome: document.getElementById('nome').value.trim(),
+  telefone: document.getElementById('telefone').value.trim(),
+  email: document.getElementById('email').value.trim(),
+  senha: document.getElementById('senha').value.trim(),
+  placa: "" // ou remova esta linha
+};
+
+
+      
+      
 
       if (!data.nome || !data.telefone || !data.email || !data.senha) {
         msg.textContent = "Preencha todos os campos";
