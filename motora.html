@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Motora - Corridas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body { font-family: Arial; margin:0; padding:0; }
+    #map { height: 50vh; width: 100%; }
+    .container { padding: 20px; max-width: 500px; margin:auto; }
+    .corrida { border:1px solid #ccc; padding:10px; margin:10px 0; border-radius:4px; }
+    input, button { width:100%; padding:10px; margin:8px 0; border-radius:4px; border:1px solid #ccc; }
+    button { cursor:pointer; }
+    .pagar { background:#28a745; color:#fff; border:none; }
+    .terminar { background:#007bff; color:#fff; border:none; }
+    .pagar:hover { background:#218838; }
+    .terminar:hover { background:#0056b3; }
+    #msg { text-align:center; margin-top:10px; color:#333; }
+    #qrcode { text-align:center; margin:10px 0; }
+  </style>
+</head>
+<body>
+  <div class="container" id="loginContainer">
+    <h2>Login Motorista</h2>
+    <input type="text" id="email" placeholder="Email" required>
+    <input type="password" id="senha" placeholder="Senha" required>
+    <button id="btnLogin">Entrar</button>
+    <p id="msg"></p>
+  </div>
+
+  <div class="container" id="corridasContainer" style="display:none;">
+    <h2>Corridas Ativas</h2>
+    <div id="corridasList"></div>
+    <p id="msgCorridas"></p>
+    <div id="qrcode"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script>
+    const loginContainer = document.getElementById('loginContainer');
+    const corridasContainer = document.getElementById('corridasContainer');
+    const msg = document.getElementById('msg');
+    const corridasList = document.getElementById('corridasList');
+    const msgCorridas = document.getElementById('msgCorridas');
+    const qrcodeDiv = document.getElementById('qrcode');
+
+    let motorista = null;
+
+    // Inicializa mapa
+    const map = L.map('map').setView([-22.5, -43.5], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
+
+    // Login
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      try {
+        const res = await fetch('https://<SEU_BACKEND_RENDER>/motora/login', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ email, senha })
+        });
+        const data = await res.json();
+        if(data.ok){
+          motorista = data.motorista;
+          loginContainer.style.display = 'none';
+          corridasContainer.style.display = 'block';
+          carregarCorridas();
+        } else { msg.textContent = "Email ou senha incorretos"; }
+      } catch(err){ msg.textContent="Erro de conexão"; }
+    });
+
+    // Função para calcular km entre dois pontos
+    function calcularDistancia(lat1, lng1, lat2, lng2){
+      const R = 6371;
+      const dLat = (lat2-lat1)*Math.PI/180;
+      const dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return (R*c).toFixed(2);
+    }
+
+    // Carregar corridas
+    async function carregarCorridas(){
+      corridasList.innerHTML = '';
+      try {
+        const res = await fetch(`https://<SEU_BACKEND_RENDER>/corridas/motora/${motorista.id}`);
+        const data = await res.json();
+        data.forEach(c => {
+          const div = document.createElement('div');
+          div.className = 'corrida';
+          div.innerHTML = `
+            <strong>Passageiro:</strong> ${c.passageiro_nome}<br>
+            <strong>Origem:</strong> ${c.origem_lat}, ${c.origem_lng}<br>
+            <strong>Destino:</strong> ${c.destino_lat}, ${c.destino_lng}<br>
+            <strong>Distância:</strong> ${calcularDistancia(c.origem_lat, c.origem_lng, c.destino_lat, c.destino_lng)} km<br>
+            <strong>Valor:</strong> ${c.valor}<br>
+            <strong>Pagamento:</strong> ${c.modo_pagamento}<br>
+            <strong>Status:</strong> ${c.status}<br>
+            <button class="pagar" onclick="marcarPago(${c.id})">Marcar como pago</button>
+            <button class="terminar" onclick="terminarCorrida(${c.id})">Terminar corrida</button>
+          `;
+          corridasList.appendChild(div);
+
+          // Adiciona marcador no mapa
+          L.marker([c.origem_lat, c.origem_lng]).addTo(map).bindPopup('Origem: ' + c.passageiro_nome);
+          L.marker([c.destino_lat, c.destino_lng]).addTo(map).bindPopup('Destino');
+        });
+      } catch(err){ msgCorridas.textContent = "Erro ao carregar corridas"; }
+    }
+
+    // Marcar como pago
+    async function marcarPago(id){
+      try {
+        const res = await fetch(`https://<SEU_BACKEND_RENDER>/corridas/pago/${id}`, { method:'POST' });
+        if(res.ok){ msgCorridas.textContent="Corrida marcada como paga"; carregarCorridas(); }
+        else msgCorridas.textContent="Erro ao atualizar pagamento";
+      } catch(err){ msgCorridas.textContent="Erro de conexão"; }
+    }
+
+    // Terminar corrida
+    async function terminarCorrida(id){
+      try {
+        const res = await fetch(`https://<SEU_BACKEND_RENDER>/corridas/terminar/${id}`, { method:'POST' });
+        if(res.ok){ msgCorridas.textContent="Corrida concluída"; carregarCorridas(); }
+        else msgCorridas.textContent="Erro ao concluir corrida";
+      } catch(err){ msgCorridas.textContent="Erro de conexão"; }
+    }
+
+    // Gera QR code fixo
+    QRCode.toCanvas(qrcodeDiv, '00020126390014br.gov.bcb.pix01171680way@gmail.com5204000053039865802BR5917ALEXANDRE RIBEIRO6011NOVA IGUACU62580520SAN2025112512210834550300017br.gov.bcb.brcode01051.0.06304A9C8', { width:200 });
+
+  </script>
+</body>
+</html>
