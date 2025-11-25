@@ -1,18 +1,2 @@
-services:
-  - type: web
-    name: moveme-backend
-    env: node
-    plan: free
-    buildCommand: "npm install"
-    startCommand: "node server.js"
-    envVars:
-      - key: DB_HOST
-        value: ep-sweet-tooth-a4vr5qka-pooler.us-east-1.aws.neon.tech
-      - key: DB_USER
-        value: neondb_owner
-      - key: DB_PASSWORD
-        value: npg_vxYc7ZP8dMNB
-      - key: DB_NAME
-        value: neondb
-      - key: DB_PORT
-        value: "5432"
+- key: DATABASE_URL
+  value: "postgresql://neondb_owner:npg_vxYc7ZP8dMNB@ep-sweet-tooth-a4vr5qka-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
