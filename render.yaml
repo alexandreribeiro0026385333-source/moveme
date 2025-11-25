@@ -7,10 +7,12 @@ services:
     startCommand: "node server.js"
     envVars:
       - key: DB_HOST
-        value: "<seu_host_neon>"
+        value: ep-sweet-tooth-a4vr5qka-pooler.us-east-1.aws.neon.tech
       - key: DB_USER
-        value: "<seu_usuario_neon>"
+        value: neondb_owner
       - key: DB_PASSWORD
-        value: "<sua_senha_neon>"
+        value: npg_vxYc7ZP8dMNB
       - key: DB_NAME
-        value: "<seu_db_neon>"
+        value: neondb
+      - key: DB_PORT
+        value: "5432"
