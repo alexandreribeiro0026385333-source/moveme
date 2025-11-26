@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teste Motorista</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  body { margin:0; font-family: Arial; background:#f4f4f4; }
+  .container { width:100%; max-width:500px; margin:auto; padding:20px; }
+  input, button { width:100%; padding:10px; margin:8px 0; border:1px solid #bbb; }
+  button { background:#007bff; color:white; border:none; }
+  #map { width:100%; height:400px; background:#eee; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="senha" placeholder="Senha">
+  <button onclick="testeLogin()">Entrar (TESTE)</button>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+// FUNÇÃO SIMPLES DE TESTE
+function testeLogin() {
+  console.log("BOTÃO FUNCIONOU!");
+  alert("JavaScript está funcionando!");
+  
+  // Tenta carregar mapa mesmo sem login
+  var map = L.map('map').setView([-15.7975, -47.8919], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  L.marker([-15.7975, -47.8919]).addTo(map).bindPopup("Teste").openPopup();
+  
+  console.log("Mapa carregado!");
+}
+
+// Teste se carrega automaticamente
+console.log("Página carregada");
+testeLogin(); // Tenta carregar mapa automaticamente
+</script>
+</body>
+</html>
