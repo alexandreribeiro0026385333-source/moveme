@@ -131,7 +131,81 @@ testeLogin(); // Tenta carregar mapa automaticamente
   <div id="map"></div>
 </div>
 
+<script>
+const API = "https://moveme-backend-v80p.onrender.com";
+let map, window.motorista;
 
+// ---- CONECTA O BOTÃO CORRETAMENTE ----
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("Página carregada, conectando botão...");
+  
+  document.getElementById("btnLogin").addEventListener("click", function() {
+    console.log("BOTÃO CLICADO - Iniciando login");
+    fazerLogin();
+  });
+});
+
+// ---- FUNÇÃO DE LOGIN ----
+async function fazerLogin() {
+  const email = document.getElementById("email").value.trim();
+  const senha = document.getElementById("senha").value.trim();
+  const msg = document.getElementById("msg");
+
+  console.log("Tentando login com:", email);
+
+  if (!email || !senha) {
+    msg.textContent = "Preencha email e senha";
+    msg.style.color = "red";
+    return;
+  }
+
+  msg.textContent = "Fazendo login...";
+  msg.style.color = "blue";
+
+  try {
+    const res = await fetch(`${API}/motora`);
+    console.log("Resposta da API:", res.status);
+    
+    const dados = await res.json();
+    console.log("Dados recebidos:", dados);
+
+    const m = dados.find(x => x.email === email && x.senha === senha);
+
+    if (!m) {
+      msg.textContent = "Login inválido";
+      msg.style.color = "red";
+      return;
+    }
+
+    window.motorista = m;
+    msg.textContent = `Logado! ${m.nome}`;
+    msg.style.color = "green";
+
+    carregarMapa(m);
+
+  } catch (e) {
+    console.error("Erro:", e);
+    msg.textContent = "Erro de conexão";
+    msg.style.color = "red";
+  }
+}
+
+// ---- MAPA ----
+function carregarMapa(motorista) {
+  const lat = motorista.latitude || -15.7975;
+  const lng = motorista.longitude || -47.8919;
+  
+  if (map) map.remove();
+  
+  map = L.map('map').setView([lat, lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  L.marker([lat, lng])
+    .addTo(map)
+    .bindPopup(`<b>${motorista.nome}</b><br>Motorista`)
+    .openPopup();
+}
+</script>
 
 
 
