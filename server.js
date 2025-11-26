@@ -50,6 +50,51 @@ app.post('/boneco', async (req, res) => {
   }
 });
 
+// --- ROTA COMPLETA PARA CORRIDAS ---
+app.post('/corridas/nova', async (req, res) => {
+  const { 
+    passageiro_id, passageiro_nome,
+    origem_lat, origem_lng, 
+    destino_lat, destino_lng,
+    valor, status
+  } = req.body;
+
+  // INSERT com TODOS os 13 campos na ordem correta
+  const query = `
+    INSERT INTO corridas 
+    (id, passageiro_id, motorista_id, origem_lat, origem_lng, 
+     destino_lat, destino_lng, status, valor, modo_pagamento, 
+     motorista_nome, passageiro_nome, created_at) 
+    VALUES (DEFAULT, $1, NULL, $2, $3, $4, $5, $6, $7, NULL, NULL, $8, NOW())
+  `;
+
+  try {
+    await pool.query(query, [
+      passageiro_id, 
+      origem_lat, origem_lng,
+      destino_lat, destino_lng, 
+      status || 'solicitada',
+      valor,
+      passageiro_nome
+    ]);
+    
+    console.log('✅ Corrida salva na tabela');
+    res.json({ ok: true });
+    
+  } catch (err) {
+    console.error('❌ Erro ao salvar corrida:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
+
+
+
 // Login Motora
 app.get('/motora', async (req, res) => {
   try {
