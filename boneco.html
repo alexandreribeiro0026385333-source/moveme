@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solicitar Corrida - Passageiro</title>
+<style>
+  body { margin:0; font-family: Arial, sans-serif; background:#f4f4f4; }
+  .container { width:100%; max-width:500px; margin:auto; padding:20px; }
+  .login-section, .solicitacao-section { background: white; padding: 20px; border-radius: 8px; margin-bottom: 15px; }
+  input, button { width:100%; padding:10px; margin:8px 0; border-radius:4px; border:1px solid #bbb; box-sizing: border-box; }
+  button { cursor: pointer; }
+  .status { padding: 10px; border-radius: 4px; margin: 5px 0; }
+  .processando { background: #fff3cd; color: #856404; }
+  .sucesso { background: #d1edff; color: #155724; }
+  .erro { background: #f8d7da; color: #721c24; }
+  small { color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Login -->
+  <div class="login-section">
+    <h2 style="text-align:center; margin-bottom:20px;">Login Passageiro</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="senha" placeholder="Senha">
+    <button onclick="fazerLogin()" style="background:#007bff; color:white;">🔑 Fazer Login</button>
+    <div id="msg"></div>
+  </div>
+
+  <!-- Solicitação de Corrida -->
+  <div class="solicitacao-section">
+    <h3 style="text-align:center;">Solicitar Corrida</h3>
+    
+    <!-- Origem -->
+    <div class="input-group">
+      <label>Endereço de Origem:</label>
+      <input type="text" id="origem" placeholder="Ex: Rua Sebastião de Melo 447, Nova Iguaçu, RJ">
+      <small>💡 Digite: Rua, Número, Cidade, Estado</small>
+      <button onclick="definirOrigem()" style="background:#17a2b8; color:white;">📍 Definir Origem</button>
+      <div id="statusOrigem"></div>
+    </div>
+
+    <!-- Destino -->
+    <div class="input-group" style="margin-top: 15px;">
+      <label>Endereço de Destino:</label>
+      <input type="text" id="destino" placeholder="Ex: Avenida Brasil 2000, Centro, Rio de Janeiro, RJ">
+      <small>💡 Digite: Rua, Número, Cidade, Estado</small>
+      <button onclick="definirDestino()" style="background:#6f42c1; color:white;">🎯 Definir Destino</button>
+      <div id="statusDestino"></div>
+    </div>
+
+    <!-- Calcular Valor -->
+    <div style="margin-top: 15px;">
+      <button onclick="calcularValor()" style="background:#ffc107; color:black;">💰 Calcular Valor da Corrida</button>
+      <div id="statusCalcular"></div>
+    </div>
+
+    <!-- Valor Calculado -->
+    <div id="valorSection" style="display:none; margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 4px;">
+      <h4>💰 Valor da Corrida: <span id="valorCorrida">R$ 0,00</span></h4>
+    </div>
+
+    <!-- Confirmar -->
+    <div style="margin-top: 15px;">
+      <button onclick="confirmarCorrida()" style="background:#28a745; color:white;">✅ Confirmar Corrida</button>
+      <div id="statusConfirmar"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- VARIÁVEIS GLOBAIS ----
+const API = "https://moveme-backend-v80p.onrender.com";
+let passageiro = null, origemCoords = null, destinoCoords = null, valorCorrida = 0;
+let executando = false;
+
+// ---- FUNÇÃO 1: LOGIN ----
+async function fazerLogin() {
+  if (executando) {
+    console.log("⏳ Login já em execução...");
+    return;
+  }
+  executando = true;
+  
+  const email = document.getElementById("email").value.trim();
+  const senha = document.getElementById("senha").value.trim();
+  const msg = document.getElementById("msg");
+
+  if (!email || !senha) {
+    mostrarStatus(msg, "❌ Digite email e senha", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(msg, "🟡 Verificando login...", "processando");
+  console.log("🔑 Iniciando login...");
+
+  try {
+    const res = await fetch(`${API}/bonecos`);
+    const dados = await res.json();
+    const p = dados.find(x => x.email === email && x.senha === senha);
+
+    if (!p) {
+      mostrarStatus(msg, "❌ Login inválido", "erro");
+      console.log("❌ Login falhou");
+      return;
+    }
+
+    passageiro = p;
+    mostrarStatus(msg, `✅ Logado: ${p.nome}`, "sucesso");
+    console.log("✅ Login OK:", p.nome);
+    
+  } catch (e) {
+    mostrarStatus(msg, "❌ Erro de conexão", "erro");
+    console.error("❌ Erro login:", e);
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- FUNÇÃO 2: DEFINIR ORIGEM ----
+async function definirOrigem() {
+  if (executando) {
+    console.log("⏳ Origem já em execução...");
+    return;
+  }
+  executando = true;
+  
+  const endereco = document.getElementById("origem").value.trim();
+  const statusOrigem = document.getElementById("statusOrigem");
+  
+  if (!endereco) {
+    mostrarStatus(statusOrigem, "❌ Digite endereço de origem", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusOrigem, "🟡 Convertendo endereço...", "processando");
+  console.log("📍 Convertendo origem:", endereco);
+
+  try {
+    const coords = await enderecoParaCoordenadas(endereco);
+    origemCoords = coords;
+    mostrarStatus(statusOrigem, `✅ Origem definida`, "sucesso");
+    console.log("✅ Origem salva:", coords);
+    
+  } catch (e) {
+    mostrarStatus(statusOrigem, "❌ Endereço não encontrado. Digite: Rua, Nº, Cidade, Estado", "erro");
+    console.error("❌ Erro origem:", e);
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- FUNÇÃO 3: DEFINIR DESTINO ----
+async function definirDestino() {
+  if (executando) {
+    console.log("⏳ Destino já em execução...");
+    return;
+  }
+  executando = true;
+  
+  const endereco = document.getElementById("destino").value.trim();
+  const statusDestino = document.getElementById("statusDestino");
+  
+  if (!endereco) {
+    mostrarStatus(statusDestino, "❌ Digite endereço de destino", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusDestino, "🟡 Convertendo endereço...", "processando");
+  console.log("🎯 Convertendo destino:", endereco);
+
+  try {
+    const coords = await enderecoParaCoordenadas(endereco);
+    destinoCoords = coords;
+    mostrarStatus(statusDestino, `✅ Destino definido`, "sucesso");
+    console.log("✅ Destino salvo:", coords);
+    
+  } catch (e) {
+    mostrarStatus(statusDestino, "❌ Endereço não encontrado. Digite: Rua, Nº, Cidade, Estado", "erro");
+    console.error("❌ Erro destino:", e);
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- FUNÇÃO 4: CALCULAR VALOR ----
+function calcularValor() {
+  if (executando) {
+    console.log("⏳ Cálculo já em execução...");
+    return;
+  }
+  executando = true;
+  
+  const statusCalcular = document.getElementById("statusCalcular");
+  
+  if (!origemCoords || !destinoCoords) {
+    mostrarStatus(statusCalcular, "❌ Defina origem e destino primeiro", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusCalcular, "🟡 Calculando distância...", "processando");
+  console.log("💰 Calculando valor...");
+
+  try {
+    const distancia = calcularDistancia(origemCoords, destinoCoords);
+    valorCorrida = distancia * 2.00; // MUDADO: R$ 2,00 por km
+    
+    document.getElementById("valorCorrida").textContent = `R$ ${valorCorrida.toFixed(2)}`;
+    document.getElementById("valorSection").style.display = "block";
+    mostrarStatus(statusCalcular, `✅ ${distancia.toFixed(2)} km × R$2,00 = R$ ${valorCorrida.toFixed(2)}`, "sucesso");
+    console.log(`💰 Valor calculado: R$ ${valorCorrida.toFixed(2)}`);
+    
+  } catch (e) {
+    mostrarStatus(statusCalcular, "❌ Erro ao calcular valor", "erro");
+    console.error("❌ Erro cálculo:", e);
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- FUNÇÃO 5: CONFIRMAR CORRIDA ----
+async function confirmarCorrida() {
+  if (executando) {
+    console.log("⏳ Confirmação já em execução...");
+    return;
+  }
+  executando = true;
+  
+  const statusConfirmar = document.getElementById("statusConfirmar");
+  
+  if (!origemCoords || !destinoCoords) {
+    mostrarStatus(statusConfirmar, "❌ Defina origem e destino", "erro");
+    executando = false;
+    return;
+  }
+
+  if (valorCorrida === 0) {
+    mostrarStatus(statusConfirmar, "❌ Calcule o valor primeiro", "erro");
+    executando = false;
+    return;
+  }
+
+  const email = document.getElementById("email").value.trim();
+  let passageiro_nome = passageiro ? passageiro.nome : email;
+  
+  if (!passageiro_nome) {
+    mostrarStatus(statusConfirmar, "❌ Digite um email", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusConfirmar, "🟡 Salvando corrida...", "processando");
+  console.log("✅ Salvando corrida...");
+
+  try {
+    const corridaData = {
+      passageiro_id: passageiro ? passageiro.id : 0,
+      passageiro_nome: passageiro_nome,
+      origem_lat: origemCoords.lat,
+      origem_lng: origemCoords.lng,
+      destino_lat: destinoCoords.lat,
+      destino_lng: destinoCoords.lng,
+      valor: valorCorrida,
+      status: 'solicitada'
+    };
+
+    console.log("📤 Dados da corrida:", corridaData);
+
+    const res = await fetch(`${API}/corridas/nova`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(corridaData)
+    });
+
+    if (res.ok) {
+      mostrarStatus(statusConfirmar, "✅ Corrida salva! Redirecionando...", "sucesso");
+      console.log("🎉 CORRIDA SALVA NA TABELA!");
+      
+      setTimeout(() => {
+        window.location.href = "mapadoboneco.html";
+      }, 2000);
+      
+    } else {
+      const erro = await res.json();
+      throw new Error(erro.error || "Erro ao salvar corrida");
+    }
+
+  } catch (e) {
+    mostrarStatus(statusConfirmar, `❌ Erro: ${e.message}`, "erro");
+    console.error("❌ Erro confirmar:", e);
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- FUNÇÕES AUXILIARES ----
+async function enderecoParaCoordenadas(endereco) {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(endereco)}&format=json&limit=1`;
+  const res = await fetch(url, { headers: {'User-Agent': 'MoveMeApp/1.0'} });
+  const data = await res.json();
+  
+  if (data.length > 0) {
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  }
+  throw new Error("Endereço não encontrado");
+}
+
+function calcularDistancia(coord1, coord2) {
+  const R = 6371;
+  const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
+  const dLon = (coord2.lng - coord1.lng) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function mostrarStatus(elemento, mensagem, tipo) {
+  elemento.innerHTML = mensagem;
+  elemento.className = `status ${tipo}`;
+}
+</script>
+</body>
+</html>
