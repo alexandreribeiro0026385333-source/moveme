@@ -110,6 +110,82 @@ app.get('/ativos', async (req, res) => {
 
 // --- ROTAS DE CORRIDAS ---
 
+// --- ROTAS CORRIDAS ---
+
+// Passageiro cria nova corrida
+app.post('/corridas/nova', async (req, res) => {
+  const { passageiro_id, passageiro_nome, origem_lat, origem_lng, destino_lat, destino_lng, valor, modo_pagamento } = req.body;
+  const query = `
+    INSERT INTO corridas 
+    (passageiro_id, passageiro_nome, origem_lat, origem_lng, destino_lat, destino_lng, valor, modo_pagamento, status) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'disponivel')
+  `;
+  try {
+    await pool.query(query, [passageiro_id, passageiro_nome, origem_lat, origem_lng, destino_lat, destino_lng, valor, modo_pagamento]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Listar corridas disponíveis para motoristas
+app.get('/corridas/disponiveis', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM corridas WHERE status = 'disponivel'`);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Motorista aceita corrida
+app.post('/corridas/aceitar/:id', async (req, res) => {
+  const { id } = req.params;
+  const { motorista_id, motorista_nome } = req.body;
+  try {
+    await pool.query('UPDATE corridas SET motorista_id=$1, motorista_nome=$2, status=$3 WHERE id=$4', 
+      [motorista_id, motorista_nome, 'andamento', id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Listar corridas em andamento do motorista
+app.get('/corridas/motorista/:id', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM corridas WHERE motorista_id = $1 AND status = 'andamento'`, [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Listar corridas do passageiro
+app.get('/corridas/passageiro/:id', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM corridas WHERE passageiro_id = $1`, [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // GET todas corridas (para motora.html)
 app.get('/corridas', async (req, res) => {
   try {
