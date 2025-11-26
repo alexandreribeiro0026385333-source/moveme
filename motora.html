@@ -296,5 +296,85 @@ function fecharModal() {
   document.getElementById("modalCorridas").style.display = "none";
 }
 </script>
+
+<script>
+const API = "https://moveme-backend-v80p.onrender.com";
+
+document.getElementById("btnLogin").onclick = async function() {
+  const email = document.getElementById("email").value.trim();
+  const senha = document.getElementById("senha").value.trim();
+  const msg = document.getElementById("msg");
+
+  msg.textContent = "Verificando login...";
+  msg.style.color = "blue";
+
+  try {
+    const response = await fetch(API + "/motora");
+    const motoristas = await response.json();
+    
+    console.log("Motoristas no banco:", motoristas);
+
+    const motorista = motoristas.find(m => m.email === email && m.senha === senha);
+
+    if (motorista) {
+      // ✅ LOGIN BEM-SUCEDIDO
+      msg.innerHTML = `✅ <b>Logado com sucesso!</b><br>Motorista: ${motorista.nome}<br>Placa: ${motorista.placa}`;
+      msg.style.color = "green";
+      
+      window.motoristaLogado = motorista;
+      carregarMapa(motorista);
+      habilitarBotoes();
+      
+    } else {
+      // ❌ LOGIN FALHOU
+      msg.innerHTML = `❌ <b>Login falhou!</b><br>Verifique email e senha<br>Motoristas no sistema: ${motoristas.length}`;
+      msg.style.color = "red";
+      
+      // Mostra mapa mesmo com falha
+      carregarMapa({nome: "Não logado", latitude: -15.7975, longitude: -47.8919});
+    }
+
+  } catch (error) {
+    msg.innerHTML = `⚠️ <b>Erro de conexão</b><br>${error.message}`;
+    msg.style.color = "orange";
+  }
+};
+
+function carregarMapa(motorista) {
+  const lat = motorista.latitude || -15.7975;
+  const lng = motorista.longitude || -47.8919;
+  
+  if (window.map) window.map.remove();
+  
+  window.map = L.map('map').setView([lat, lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
+
+  const marker = L.marker([lat, lng]).addTo(window.map);
+  
+  if (motorista.email) {
+    // Motorista logado
+    marker.bindPopup(`
+      <b>🚗 ${motorista.nome}</b><br>
+      📧 ${motorista.email}<br>
+      🏷️ ${motorista.placa}<br>
+      ✅ <span style="color:green">LOGADO</span>
+    `).openPopup();
+  } else {
+    // Não logado
+    marker.bindPopup(`<b>⚠️ Não logado</b><br>Faça login primeiro`).openPopup();
+  }
+}
+
+function habilitarBotoes() {
+  // Habilita os botões de corrida após login
+  document.querySelectorAll('.botoes-corrida button').forEach(btn => {
+    btn.style.opacity = "1";
+    btn.disabled = false;
+  });
+}
+</script>
+
+
+  
 </body>
 </html>
