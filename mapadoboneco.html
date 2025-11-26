@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acompanhar Corrida - Passageiro</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+<style>
+  body { margin:0; font-family: Arial, sans-serif; background:#f4f4f4; }
+  .container { width:100%; max-width:500px; margin:auto; padding:20px; }
+  .login-section, .corrida-section { background: white; padding: 20px; border-radius: 8px; margin-bottom: 15px; }
+  input, button { width:100%; padding:10px; margin:8px 0; border-radius:4px; border:1px solid #bbb; box-sizing: border-box; }
+  button { cursor: pointer; border:none; }
+  #map { width:100%; height:50vh; background:#eee; border-radius: 8px; margin:10px 0; }
+  .status { padding: 10px; border-radius: 4px; margin: 5px 0; }
+  .processando { background: #fff3cd; color: #856404; }
+  .sucesso { background: #d1edff; color: #155724; }
+  .erro { background: #f8d7da; color: #721c24; }
+  .info { background: #e9ecef; padding: 15px; border-radius: 8px; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Login -->
+  <div class="login-section">
+    <h2 style="text-align:center; margin-bottom:20px;">Acompanhar Corrida</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="senha" placeholder="Senha">
+    <button onclick="fazerLogin()" style="background:#007bff; color:white;">🔑 Fazer Login</button>
+    <div id="msg"></div>
+  </div>
+
+  <!-- Corrida -->
+  <div id="corridaSection" class="corrida-section" style="display:none;">
+    <h3 style="text-align:center;">Sua Corrida</h3>
+    
+    <!-- Informações -->
+    <div class="info">
+      <p><strong>💰 Valor:</strong> <span id="infoValor">R$ 0,00</span></p>
+      <p><strong>📍 Origem:</strong> <span id="infoOrigem">-</span></p>
+      <p><strong>🎯 Destino:</strong> <span id="infoDestino">-</span></p>
+      <p><strong>🚗 Status:</strong> <span id="infoStatus">-</span></p>
+      <p><strong>👤 Motorista:</strong> <span id="infoMotorista">-</span></p>
+    </div>
+
+    <!-- BOTÃO 1: Buscar Corrida -->
+    <button onclick="buscarCorrida()" style="background:#17a2b8; color:white;">🔍 Buscar Minha Corrida</button>
+    <div id="statusBuscar"></div>
+
+    <!-- BOTÃO 2: Verificar Motorista -->
+    <button onclick="verificarMotorista()" style="background:#6f42c1; color:white;">👥 Verificar Motorista</button>
+    <div id="statusMotorista"></div>
+
+    <!-- BOTÃO 3: Carregar Mapa -->
+    <button onclick="carregarMapa()" style="background:#28a745; color:white;">🗺️ Carregar Mapa com Rota</button>
+    <div id="statusMapa"></div>
+
+    <!-- BOTÃO 4: Atualizar Status -->
+    <button onclick="atualizarStatus()" style="background:#ffc107; color:black;">🔄 Atualizar para "Esperando Motorista"</button>
+    <div id="statusAtualizar"></div>
+
+    <!-- Mapa -->
+    <div id="map"></div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script>
+// ---- VARIÁVEIS GLOBAIS ----
+const API = "https://moveme-backend-v80p.onrender.com";
+let passageiro = null, mapa = null, corridaAtual = null;
+let executando = false;
+
+// ---- BOTÃO 1: LOGIN ----
+async function fazerLogin() {
+  if (executando) return;
+  executando = true;
+  
+  const email = document.getElementById("email").value.trim();
+  const senha = document.getElementById("senha").value.trim();
+  const msg = document.getElementById("msg");
+
+  if (!email || !senha) {
+    mostrarStatus(msg, "❌ Digite email e senha", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(msg, "🟡 Verificando login...", "processando");
+
+  try {
+    const res = await fetch(`${API}/bonecos`);
+    const dados = await res.json();
+    const p = dados.find(x => x.email === email && x.senha === senha);
+
+    if (!p) {
+      mostrarStatus(msg, "❌ Login inválido", "erro");
+      return;
+    }
+
+    passageiro = p;
+    mostrarStatus(msg, `✅ Logado: ${p.nome}`, "sucesso");
+    
+    // Mostra seção da corrida
+    document.getElementById("corridaSection").style.display = "block";
+    
+  } catch (e) {
+    mostrarStatus(msg, "❌ Erro de conexão", "erro");
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- BOTÃO 2: BUSCAR CORRIDA ----
+async function buscarCorrida() {
+  if (executando) return;
+  executando = true;
+  
+  const statusBuscar = document.getElementById("statusBuscar");
+  
+  if (!passageiro) {
+    mostrarStatus(statusBuscar, "❌ Faça login primeiro", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusBuscar, "🟡 Buscando sua corrida...", "processando");
+
+  try {
+    const res = await fetch(`${API}/corridas/passageiro/${passageiro.id}`);
+    const corridas = await res.json();
+    
+    if (corridas.length === 0) {
+      mostrarStatus(statusBuscar, "❌ Nenhuma corrida encontrada", "erro");
+      return;
+    }
+
+    // Pega a última corrida
+    corridaAtual = corridas[0];
+    mostrarStatus(statusBuscar, "✅ Corrida encontrada!", "sucesso");
+    
+    // Atualiza informações na tela
+    atualizarInformacoes();
+    
+  } catch (e) {
+    mostrarStatus(statusBuscar, "❌ Erro ao buscar corrida", "erro");
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- BOTÃO 3: VERIFICAR MOTORISTA ----
+async function verificarMotorista() {
+  if (executando) return;
+  executando = true;
+  
+  const statusMotorista = document.getElementById("statusMotorista");
+  
+  if (!corridaAtual) {
+    mostrarStatus(statusMotorista, "❌ Busque uma corrida primeiro", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusMotorista, "🟡 Verificando motorista...", "processando");
+
+  try {
+    // Busca a corrida atualizada para ver se tem motorista
+    const res = await fetch(`${API}/corridas/passageiro/${passageiro.id}`);
+    const corridas = await res.json();
+    
+    if (corridas.length === 0) {
+      mostrarStatus(statusMotorista, "❌ Corrida não encontrada", "erro");
+      return;
+    }
+
+    const corridaAtualizada = corridas[0];
+    
+    if (corridaAtualizada.motorista_nome && corridaAtualizada.motorista_id) {
+      // Motorista encontrado!
+      corridaAtual = corridaAtualizada;
+      atualizarInformacoes();
+      mostrarStatus(statusMotorista, `✅ Motorista encontrado: ${corridaAtualizada.motorista_nome} está a caminho!`, "sucesso");
+    } else {
+      mostrarStatus(statusMotorista, "❌ Nenhum motorista aceitou sua corrida ainda", "erro");
+    }
+    
+  } catch (e) {
+    mostrarStatus(statusMotorista, "❌ Erro ao verificar motorista", "erro");
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- BOTÃO 4: CARREGAR MAPA ----
+function carregarMapa() {
+  if (executando) return;
+  executando = true;
+  
+  const statusMapa = document.getElementById("statusMapa");
+  
+  if (!corridaAtual) {
+    mostrarStatus(statusMapa, "❌ Busque uma corrida primeiro", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusMapa, "🟡 Carregando mapa...", "processando");
+
+  try {
+    // Remove mapa anterior se existir
+    if (mapa) {
+      mapa.remove();
+    }
+    
+    // Cria novo mapa
+    mapa = L.map('map').setView([corridaAtual.origem_lat, corridaAtual.origem_lng], 13);
+    
+    // Adiciona tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(mapa);
+    
+    // Marcador de origem
+    L.marker([corridaAtual.origem_lat, corridaAtual.origem_lng])
+      .addTo(mapa)
+      .bindPopup("📍 Sua Localização")
+      .openPopup();
+      
+    // Marcador de destino
+    L.marker([corridaAtual.destino_lat, corridaAtual.destino_lng])
+      .addTo(mapa)
+      .bindPopup("🎯 Destino");
+    
+    // Rota entre pontos (se a biblioteca carregou)
+    if (L.Routing) {
+      L.Routing.control({
+        waypoints: [
+          L.latLng(corridaAtual.origem_lat, corridaAtual.origem_lng),
+          L.latLng(corridaAtual.destino_lat, corridaAtual.destino_lng)
+        ],
+        routeWhileDragging: false,
+        showAlternatives: false,
+        lineOptions: {
+          styles: [{color: 'blue', opacity: 0.6, weight: 4}]
+        }
+      }).addTo(mapa);
+    }
+    
+    mostrarStatus(statusMapa, "✅ Mapa carregado com rota!", "sucesso");
+    
+  } catch (e) {
+    mostrarStatus(statusMapa, "❌ Erro ao carregar mapa", "erro");
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- BOTÃO 5: ATUALIZAR STATUS ----
+async function atualizarStatus() {
+  if (executando) return;
+  executando = true;
+  
+  const statusAtualizar = document.getElementById("statusAtualizar");
+  
+  if (!corridaAtual) {
+    mostrarStatus(statusAtualizar, "❌ Busque uma corrida primeiro", "erro");
+    executando = false;
+    return;
+  }
+
+  mostrarStatus(statusAtualizar, "🟡 Atualizando status...", "processando");
+
+  try {
+    // Atualiza status para "esperando motorista"
+    const dados = { status: "esperando motorista" };
+    
+    const res = await fetch(`${API}/corridas/${corridaAtual.id}/status`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(dados)
+    });
+
+    if (res.ok) {
+      mostrarStatus(statusAtualizar, "✅ Status atualizado: 'esperando motorista'", "sucesso");
+      // Atualiza informações locais
+      corridaAtual.status = "esperando motorista";
+      atualizarInformacoes();
+    } else {
+      throw new Error("Erro ao atualizar status");
+    }
+    
+  } catch (e) {
+    mostrarStatus(statusAtualizar, "❌ Erro ao atualizar status", "erro");
+  } finally {
+    executando = false;
+  }
+}
+
+// ---- FUNÇÃO AUXILIAR: ATUALIZAR INFORMAÇÕES ----
+function atualizarInformacoes() {
+  if (!corridaAtual) return;
+  
+  document.getElementById("infoValor").textContent = `R$ ${corridaAtual.valor}`;
+  document.getElementById("infoOrigem").textContent = `${corridaAtual.origem_lat.toFixed(6)}, ${corridaAtual.origem_lng.toFixed(6)}`;
+  document.getElementById("infoDestino").textContent = `${corridaAtual.destino_lat.toFixed(6)}, ${corridaAtual.destino_lng.toFixed(6)}`;
+  document.getElementById("infoStatus").textContent = traduzirStatus(corridaAtual.status);
+  document.getElementById("infoMotorista").textContent = corridaAtual.motorista_nome || "Aguardando motorista...";
+}
+
+// ---- FUNÇÃO AUXILIAR: TRADUZIR STATUS ----
+function traduzirStatus(status) {
+  const statusMap = {
+    'solicitada': '🟡 Aguardando',
+    'esperando motorista': '🟡 Esperando Motorista',
+    'em andamento': '➡️ Em Andamento',
+    'em casa': '🏠 Em Casa',
+    'concluida': '✅ Concluída'
+  };
+  return statusMap[status] || status;
+}
+
+// ---- FUNÇÃO AUXILIAR: MOSTRAR STATUS ----
+function mostrarStatus(elemento, mensagem, tipo) {
+  elemento.innerHTML = mensagem;
+  elemento.className = `status ${tipo}`;
+}
+</script>
+</body>
+</html>
