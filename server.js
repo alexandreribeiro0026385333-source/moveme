@@ -80,6 +80,23 @@ app.put('/motora/:id/status', async (req, res) => {
   }
 });
 
+
+// rotas para bonecos 
+
+// GET todos bonecos (para login do boneco.html)
+app.get('/bonecos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM bonecos');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
 // --- ROTAS DE MAPA ---
 app.get('/ativos', async (req, res) => {
   try {
