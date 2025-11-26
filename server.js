@@ -100,6 +100,68 @@ app.put('/corridas/:id/status', async (req, res) => {
   }
 });
 
+// NO SERVER.JS - Adicionar esta rota:
+
+// PUT atualizar motorista completo
+app.put('/motora/:id', async (req, res) => {
+  const { status, corrida_id, passageiro_id, total_corridas_dia, total_valor_dia, latitude, longitude } = req.body;
+  
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (status !== undefined) {
+    updates.push(`status = $${paramCount}`);
+    values.push(status);
+    paramCount++;
+  }
+  if (corrida_id !== undefined) {
+    updates.push(`corrida_id = $${paramCount}`);
+    values.push(corrida_id);
+    paramCount++;
+  }
+  if (passageiro_id !== undefined) {
+    updates.push(`passageiro_id = $${paramCount}`);
+    values.push(passageiro_id);
+    paramCount++;
+  }
+  if (total_corridas_dia !== undefined) {
+    updates.push(`total_corridas_dia = $${paramCount}`);
+    values.push(total_corridas_dia);
+    paramCount++;
+  }
+  if (total_valor_dia !== undefined) {
+    updates.push(`total_valor_dia = $${paramCount}`);
+    values.push(total_valor_dia);
+    paramCount++;
+  }
+  if (latitude !== undefined) {
+    updates.push(`latitude = $${paramCount}`);
+    values.push(latitude);
+    paramCount++;
+  }
+  if (longitude !== undefined) {
+    updates.push(`longitude = $${paramCount}`);
+    values.push(longitude);
+    paramCount++;
+  }
+
+  values.push(req.params.id);
+
+  try {
+    await pool.query(
+      `UPDATE motora SET ${updates.join(', ')} WHERE id = $${paramCount}`,
+      values
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
 
 
 
