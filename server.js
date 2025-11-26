@@ -87,7 +87,18 @@ app.post('/corridas/nova', async (req, res) => {
   }
 });
 
-
+// NO SERVER.JS - Rota que falta  
+app.put('/corridas/:id/status', async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE corridas SET status = $1 WHERE id = $2',
+      [req.body.status, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 
@@ -114,6 +125,64 @@ app.get('/bonecos', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// NO SERVER.JS - Adicionar estas rotas:
+
+// GET todas as corridas
+app.get('/corridas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM corridas ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET corridas por passageiro_id
+app.get('/corridas/passageiro/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM corridas WHERE passageiro_id = $1 ORDER BY id DESC', 
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET corridas por motorista_id  
+app.get('/corridas/motorista/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM corridas WHERE motorista_id = $1 ORDER BY id DESC',
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET corridas por status
+app.get('/corridas/status/:status', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM corridas WHERE status = $1 ORDER BY id DESC',
+      [req.params.status]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
 
 // Mapa Ativos
 app.get('/ativos', async (req, res) => {
