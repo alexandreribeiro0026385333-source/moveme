@@ -240,7 +240,38 @@ app.get('/corridas/status/:status', async (req, res) => {
   }
 });
 
+app.post('/corridas/:id/aceitar', async (req, res) => {
+  const { motorista_id, motorista_nome } = req.body;
+  
+  try {
+    // 1. Pega corrida atual
+    const corrida = await pool.query('SELECT * FROM corridas WHERE id = $1', [req.params.id]);
+    
+    // 2. INSERT novo registro com todos os dados
+    await pool.query(`
+      INSERT INTO corridas 
+      (passageiro_id, origem_lat, origem_lng, destino_lat, destino_lng, 
+       status, valor, modo_pagamento, motorista_nome, passageiro_nome, motorista_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `, [
+      corrida.rows[0].passageiro_id,
+      corrida.rows[0].origem_lat,
+      corrida.rows[0].origem_lng, 
+      corrida.rows[0].destino_lat,
+      corrida.rows[0].destino_lng,
+      'em andamento',
+      corrida.rows[0].valor,
+      corrida.rows[0].modo_pagamento,
+      motorista_nome,
+      corrida.rows[0].passageiro_nome,
+      motorista_id
+    ]);
 
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 
