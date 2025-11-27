@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat - MOVEME</title>
+<style>
+  body { 
+    margin:0; 
+    font-family: Arial, sans-serif; 
+    background:#f4f4f4; 
+  }
+  .container { 
+    width:100%; 
+    max-width:500px; 
+    margin:auto; 
+    padding:20px; 
+  }
+  .login-section, .chat-section { 
+    background: white; 
+    padding: 20px; 
+    border-radius: 8px; 
+    margin-bottom: 15px; 
+  }
+  input, select, button { 
+    padding:10px; 
+    margin:8px 0; 
+    border-radius:4px; 
+    border:1px solid #bbb; 
+    box-sizing: border-box; 
+    width:100%;
+  }
+  button { 
+    background:#007bff; 
+    color:white; 
+    border:none; 
+    cursor: pointer;
+  }
+  button:hover { 
+    background:#0056b3; 
+  }
+  .logo {
+    text-align: center;
+    color: red;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+  #chatMessages {
+    height: 300px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin: 10px 0;
+    overflow-y: auto;
+    background: #f9f9f9;
+  }
+  .msg-motorista {
+    text-align: right;
+    background: #007bff;
+    color: white;
+    padding: 8px;
+    margin: 5px;
+    border-radius: 10px;
+    display: inline-block;
+    max-width: 80%;
+  }
+  .msg-passageiro {
+    text-align: left;
+    background: #28a745;
+    color: white;
+    padding: 8px;
+    margin: 5px;
+    border-radius: 10px;
+    display: inline-block;
+    max-width: 80%;
+  }
+  .chat-input {
+    display: flex;
+    gap: 5px;
+  }
+  .chat-input input {
+    flex: 1;
+  }
+  #avatarInput {
+    width: 100px;
+  }
+  #mensagemInput {
+    flex: 2;
+  }
+  .info-corrida {
+    background: #e9ecef;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Logo -->
+  <div class="logo">MOVEME</div>
+
+  <!-- Login -->
+  <div class="login-section" id="loginSection">
+    <h2 style="text-align:center; margin-bottom:20px;">Login Chat</h2>
+    <select id="userType">
+      <option value="">Selecione o tipo</option>
+      <option value="motorista">Motorista</option>
+      <option value="passageiro">Passageiro</option>
+    </select>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="senha" placeholder="Senha">
+    <button onclick="fazerLogin()">🔑 Entrar no Chat</button>
+    <div id="msg"></div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-section" id="chatSection" style="display:none;">
+    <h3 style="text-align:center;">Chat da Corrida</h3>
+    
+    <div id="infoCorrida" class="info-corrida"></div>
+    
+    <div id="chatMessages"></div>
+    
+    <div class="chat-input">
+      <input type="text" id="avatarInput" placeholder="Seu nome">
+      <input type="text" id="mensagemInput" placeholder="Digite sua mensagem...">
+      <button onclick="enviarMensagem()" style="width:80px">📤</button>
+    </div>
+    
+    <button onclick="carregarMensagens()" style="background:#17a2b8; margin-top:10px;">🔄 Atualizar Chat</button>
+  </div>
+</div>
+
+<script>
+const API = "https://moveme-backend-v80p.onrender.com";
+let usuario = null;
+let corridaAtual = null;
+let userType = null;
+let userId = null;
+
+// ---- FUNÇÃO LOGIN ----
+async function fazerLogin() {
+  const userTypeSelect = document.getElementById("userType").value;
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  const msg = document.getElementById("msg");
+
+  if (!userTypeSelect || !email || !senha) {
+    mostrarMsg(msg, "❌ Preencha todos os campos", "erro");
+    return;
+  }
+
+  mostrarMsg(msg, "🟡 Verificando login...", "processando");
+
+  try {
+    // Busca usuário na tabela correta
+    const endpoint = userTypeSelect === 'motorista' ? '/motora' : '/bonecos';
+    const res = await fetch(API + endpoint);
+    const dados = await res.json();
+    
+    const user = dados.find(x => x.email === email && x.senha === senha);
+    
+    if (!user) {
+      mostrarMsg(msg, "❌ Login inválido", "erro");
+      return;
+    }
+
+    // Busca última corrida do usuário
+    const corridaEndpoint = userTypeSelect === 'motorista' 
+      ? `/corridas/motorista/${user.id}`
+      : `/corridas/passageiro/${user.id}`;
+    
+    const corridaRes = await fetch(API + corridaEndpoint);
+    const corridas = await corridaRes.json();
+    
+    if (corridas.length === 0) {
+      mostrarMsg(msg, "❌ Nenhuma corrida encontrada", "erro");
+      return;
+    }
+
+    // Pega a última corrida
+    corridaAtual = corridas[0];
+    usuario = user;
+    userType = userTypeSelect;
+    userId = user.id;
+
+    // Verifica se motorista está na corrida (para passageiro)
+    if (userTypeSelect === 'passageiro' && !corridaAtual.motorista_id) {
+      mostrarMsg(msg, "❌ Nenhum motorista na sua corrida", "erro");
+      return;
+    }
+
+    // Verifica se passageiro está na corrida (para motorista)
+    if (userTypeSelect === 'motorista' && !corridaAtual.passageiro_id) {
+      mostrarMsg(msg, "❌ Nenhum passageiro na sua corrida", "erro");
+      return;
+    }
+
+    mostrarMsg(msg, "✅ Logado com sucesso", "sucesso");
+    
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('chatSection').style.display = 'block';
+    
+    carregarInfoCorrida();
+    carregarMensagens();
+    
+  } catch (e) {
+    mostrarMsg(msg, "❌ Erro de conexão", "erro");
+  }
+}
+
+// ---- CARREGAR INFORMAÇÕES DA CORRIDA ----
+function carregarInfoCorrida() {
+  if (!corridaAtual) return;
+  
+  const infoDiv = document.getElementById('infoCorrida');
+  const outroUsuario = userType === 'motorista' 
+    ? corridaAtual.passageiro_nome 
+    : corridaAtual.motorista_nome;
+  
+  infoDiv.innerHTML = `
+    <p><strong>Corrida ID:</strong> ${corridaAtual.id}</p>
+    <p><strong>${userType === 'motorista' ? 'Passageiro' : 'Motorista'}:</strong> ${outroUsuario}</p>
+    <p><strong>Status:</strong> ${corridaAtual.status}</p>
+  `;
+}
+
+// ---- CARREGAR MENSAGENS ----
+function carregarMensagens() {
+  if (!corridaAtual) return;
+  
+  fetch(API + "/chat/" + corridaAtual.id)
+    .then(res => res.json())
+    .then(mensagens => {
+      const chatDiv = document.getElementById('chatMessages');
+      chatDiv.innerHTML = '';
+      
+      mensagens.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = msg._tipo === 'motorista' ? 'msg-motorista' : 'msg-passageiro';
+        div.innerHTML = `<strong>${msg.avatar}:</strong> ${msg.mensagem}`;
+        chatDiv.appendChild(div);
+      });
+      
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    })
+    .catch(e => {
+      console.error("Erro ao carregar mensagens:", e);
+    });
+}
+
+// ---- ENVIAR MENSAGEM ----
+function enviarMensagem() {
+  const avatarInput = document.getElementById('avatarInput');
+  const mensagemInput = document.getElementById('mensagemInput');
+  const avatar = avatarInput.value.trim();
+  const mensagem = mensagemInput.value.trim();
+  
+  if (!avatar) {
+    alert("Digite seu nome no chat");
+    return;
+  }
+  
+  if (!mensagem) {
+    alert("Digite uma mensagem");
+    return;
+  }
+  
+  if (!usuario || !corridaAtual) return;
+  
+  fetch(API + "/chat/enviar", {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      corrida_id: corridaAtual.id,
+      _tipo: userType,
+      _id: userId,
+      user_nome: usuario.nome,
+      avatar: avatar,
+      mensagem: mensagem
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    mensagemInput.value = '';
+    carregarMensagens();
+  })
+  .catch(e => {
+    console.error("Erro ao enviar mensagem:", e);
+  });
+}
+
+// ---- FUNÇÃO AUXILIAR ----
+function mostrarMsg(elemento, mensagem, tipo) {
+  elemento.innerHTML = mensagem;
+  elemento.style.color = tipo === 'erro' ? 'red' : tipo === 'sucesso' ? 'green' : 'orange';
+}
+
+// ---- ATUALIZAÇÃO AUTOMÁTICA ----
+setInterval(() => {
+  if (usuario && corridaAtual) {
+    carregarMensagens();
+  }
+}, 3000);
+</script>
+</body>
+</html>
