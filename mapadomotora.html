@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motorista - Executar Corrida</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  body { 
+    margin:0; 
+    font-family: Arial, sans-serif; 
+    background:#f4f4f4; 
+  }
+  .container { 
+    width:100%; 
+    max-width:500px; 
+    margin:auto; 
+    padding:20px; 
+  }
+  .logo {
+    text-align: center;
+    color: #ff0000;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+  .login-section, .user-info {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+  }
+  input, button { 
+    width:100%; 
+    padding:10px; 
+    margin:8px 0; 
+    border-radius:4px; 
+    border:1px solid #bbb; 
+    box-sizing: border-box;
+  }
+  button { 
+    background:#007bff; 
+    color:white; 
+    border:none; 
+    cursor: pointer;
+  }
+  button:hover { 
+    background:#0056b3; 
+  }
+  .botoes-corrida {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+  }
+  .botoes-corrida button {
+    flex: 1;
+    padding: 12px;
+  }
+  #btnVerificar { background: #17a2b8; }
+  #btnCarregarMapa { background: #28a745; }
+  #btnTerminar { background: #ffc107; color: black; }
+  #btnPagar { background: #dc3545; }
+  #btnChat { background: #6f42c1; }
+  
+  #infoCorrida {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+  }
+  #map { 
+    width:100%; 
+    height:80vh;  /* AUMENTADO de 70vh para 80vh */
+    background:#eee;
+    border-radius: 8px;
+    margin-top: 15px;
+  }
+  #msg { 
+    text-align:center; 
+    color:red; 
+    margin: 10px 0;
+  }
+  .readonly-input {
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    color: #495057;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Logo -->
+  <div class="logo">MOVEME</div>
+
+  <!-- Login -->
+  <div class="login-section" id="loginSection">
+    <h2 style="text-align:center; margin-bottom:20px;">Login Motorista</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="senha" placeholder="Senha">
+    <button onclick="fazerLogin()">Entrar</button>
+    <p id="msg"></p>
+  </div>
+
+  <!-- Informações do Usuário -->
+  <div class="user-info" id="userInfo" style="display:none;">
+    <h3 id="saudacao"></h3>
+    <p><strong>ID:</strong> <span id="userId"></span></p>
+    <p><strong>Email:</strong> <span id="userEmail"></span></p>
+  </div>
+
+  <!-- Botões -->
+  <div class="botoes-corrida">
+    <button onclick="verificarCorrida()" id="btnVerificar">🔍 Verificar Corrida</button>
+    <button onclick="carregarMapa()" id="btnCarregarMapa">🗺️ Carregar Mapa</button>
+    <button onclick="abrirChat()" id="btnChat">💬 Chat</button>
+  </div>
+
+  <div class="botoes-corrida">
+    <button onclick="terminarCorrida()" id="btnTerminar">🏁 Terminar Corrida</button>
+    <button onclick="pagarCorrida()" id="btnPagar">💳 Pagar</button>
+  </div>
+
+  <!-- Informações da Corrida -->
+  <div id="infoCorrida" style="display:none;">
+    <h3>Corrida Atual:</h3>
+    <input type="text" id="infoPassageiro" class="readonly-input" readonly placeholder="Nome do Passageiro">
+    <input type="text" id="infoValor" class="readonly-input" readonly placeholder="Valor da Corrida">
+    <input type="text" id="infoOrigem" class="readonly-input" readonly placeholder="Origem">
+    <input type="text" id="infoDestino" class="readonly-input" readonly placeholder="Destino">
+  </div>
+
+  <!-- Mapa -->
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const API = "https://moveme-backend-v80p.onrender.com";
+let map;
+let motoristaLogado = null;
+let corridaAtual = null;
+
+// ---- AO CARREGAR A PÁGINA ----
+window.onload = function() {
+  // Tenta pegar motorista_id da URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const motoristaId = urlParams.get('motorista_id');
+  
+  if (motoristaId) {
+    // Se tem ID na URL, busca dados do motorista
+    buscarMotoristaPorId(motoristaId);
+  }
+};
+
+// ---- BUSCAR MOTORISTA POR ID ----
+function buscarMotoristaPorId(id) {
+  fetch(API + "/motora")
+    .then(res => res.json())
+    .then(dados => {
+      const motorista = dados.find(x => x.id == id);
+      
+      if (motorista) {
+        motoristaLogado = motorista;
+        mostrarInfoUsuario(motorista);
+        document.getElementById('loginSection').style.display = 'none';
+      }
+    })
+    .catch(e => {
+      console.error("Erro ao buscar motorista:", e);
+    });
+}
+
+// ---- FUNÇÃO LOGIN ----
+function fazerLogin() {
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  const msg = document.getElementById("msg");
+
+  if (!email || !senha) {
+    msg.innerHTML = "Digite email e senha";
+    return;
+  }
+
+  fetch(API + "/motora")
+    .then(res => res.json())
+    .then(dados => {
+      const motorista = dados.find(x => x.email === email && x.senha === senha);
+      
+      if (!motorista) {
+        msg.innerHTML = "Login inválido";
+        return;
+      }
+
+      motoristaLogado = motorista;
+      msg.style.color = "green";
+      msg.innerHTML = "Logado com sucesso";
+      mostrarInfoUsuario(motorista);
+    })
+    .catch(e => {
+      msg.innerHTML = "Erro de conexão";
+    });
+}
+
+// ---- MOSTRAR INFORMAÇÕES DO USUÁRIO ----
+function mostrarInfoUsuario(motorista) {
+  const userInfo = document.getElementById("userInfo");
+  const saudacao = document.getElementById("saudacao");
+  const userId = document.getElementById("userId");
+  const userEmail = document.getElementById("userEmail");
+  
+  // Pega primeiro nome
+  const firstName = motorista.nome.split(' ')[0];
+  
+  saudacao.innerHTML = "👋 Olá, " + firstName + "!";
+  userId.innerHTML = motorista.id;
+  userEmail.innerHTML = motorista.email;
+  
+  userInfo.style.display = 'block';
+  document.getElementById('loginSection').style.display = 'none';
+}
+
+// ---- VERIFICAR CORRIDA ----
+function verificarCorrida() {
+  if (!motoristaLogado) {
+    alert("Faça login primeiro");
+    return;
+  }
+
+  fetch(API + "/corridas/motorista/" + motoristaLogado.id)
+    .then(res => res.json())
+    .then(corridas => {
+      const corridaAndamento = corridas.find(c => c.status === 'em andamento');
+      
+      if (!corridaAndamento) {
+        alert("Nenhuma corrida em andamento encontrada");
+        return;
+      }
+
+      corridaAtual = corridaAndamento;
+      
+      document.getElementById('infoCorrida').style.display = 'block';
+      document.getElementById('infoPassageiro').value = corridaAtual.passageiro_nome;
+      document.getElementById('infoValor').value = "R$ " + corridaAtual.valor;
+      
+      converterLatLngParaEndereco(corridaAtual.origem_lat, corridaAtual.origem_lng)
+        .then(origem => {
+          document.getElementById('infoOrigem').value = origem;
+        });
+        
+      converterLatLngParaEndereco(corridaAtual.destino_lat, corridaAtual.destino_lng)
+        .then(destino => {
+          document.getElementById('infoDestino').value = destino;
+        });
+      
+      alert("Corrida encontrada! Carregue o mapa para iniciar.");
+    })
+    .catch(e => {
+      alert("Erro ao buscar corrida");
+    });
+}
+
+// ---- CARREGAR MAPA ----
+function carregarMapa() {
+  if (!corridaAtual) {
+    alert("Verifique a corrida primeiro");
+    return;
+  }
+
+  if (map) {
+    map.remove();
+  }
+
+  const centerLat = (corridaAtual.origem_lat + corridaAtual.destino_lat) / 2;
+  const centerLng = (corridaAtual.origem_lng + corridaAtual.destino_lng) / 2;
+  
+  map = L.map('map').setView([centerLat, centerLng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  L.marker([corridaAtual.origem_lat, corridaAtual.origem_lng])
+    .addTo(map)
+    .bindPopup("<b>📍 Origem</b><br>" + corridaAtual.passageiro_nome)
+    .openPopup();
+
+  L.marker([corridaAtual.destino_lat, corridaAtual.destino_lng])
+    .addTo(map)
+    .bindPopup("<b>🎯 Destino</b><br>" + corridaAtual.passageiro_nome);
+
+  const rota = [
+    [corridaAtual.origem_lat, corridaAtual.origem_lng],
+    [corridaAtual.destino_lat, corridaAtual.destino_lng]
+  ];
+  
+  L.polyline(rota, {color: 'blue'}).addTo(map);
+  
+  alert("Mapa da corrida do passageiro carregado!");
+}
+
+// ---- ABRIR CHAT ----
+function abrirChat() {
+  if (!motoristaLogado) {
+    alert("Faça login primeiro");
+    return;
+  }
+
+  if (!corridaAtual) {
+    alert("Verifique uma corrida primeiro");
+    return;
+  }
+
+  const chatUrl = "chat.html?corrida_id=" + corridaAtual.id + "&user_type=motorista&user_id=" + motoristaLogado.id;
+  window.open(chatUrl, '_blank');
+}
+
+// ---- TERMINAR CORRIDA ----
+function terminarCorrida() {
+  if (!corridaAtual) {
+    alert("Nenhuma corrida ativa");
+    return;
+  }
+
+  fetch(API + "/corridas/" + corridaAtual.id + "/status", {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ status: 'em casa' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert("Corrida terminada! Aguardando pagamento.");
+  })
+  .catch(e => {
+    alert("Erro ao terminar corrida");
+  });
+}
+
+// ---- PAGAR CORRIDA ----
+function pagarCorrida() {
+  if (!corridaAtual || !motoristaLogado) {
+    alert("Nenhuma corrida ativa");
+    return;
+  }
+
+  fetch(API + "/corridas/" + corridaAtual.id + "/status", {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ 
+      modo_pagamento: 'pago',
+      motorista_nome: null,
+      motorista_id: null
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    return fetch(API + "/motora");
+  })
+  .then(res => res.json())
+  .then(motoristas => {
+    const motoristaAtual = motoristas.find(m => m.id === motoristaLogado.id);
+    
+    if (!motoristaAtual) {
+      alert("Erro: Motorista não encontrado");
+      return;
+    }
+
+    const novasCorridasDia = (motoristaAtual.total_corridas_dia || 0) + 1;
+    const novoValorDia = (parseFloat(motoristaAtual.total_valor_dia) || 0) + parseFloat(corridaAtual.valor);
+
+    return fetch(API + "/motora/" + motoristaLogado.id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ 
+        status: 'livre',
+        corrida_id: null,
+        passageiro_id: null,
+        total_corridas_dia: novasCorridasDia,
+        total_valor_dia: novoValorDia,
+        latitude: null,
+        longitude: null
+      })
+    });
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert("Pagamento confirmado! Corrida finalizada.");
+    document.getElementById('infoCorrida').style.display = 'none';
+    corridaAtual = null;
+  })
+  .catch(e => {
+    alert("Erro ao processar pagamento");
+  });
+}
+
+// ---- FUNÇÕES AUXILIARES ----
+function converterLatLngParaEndereco(lat, lng) {
+  return fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng)
+    .then(res => res.json())
+    .then(data => {
+      if (data.address) {
+        const addr = data.address;
+        return (addr.road || '') + ' ' + (addr.house_number || '') + ', ' + (addr.suburb || addr.neighbourhood || '') + '/' + (addr.state || '');
+      }
+      return "Endereço não encontrado";
+    })
+    .catch(e => {
+      return "Erro ao buscar endereço";
+    });
+}
+</script>
+</body>
+</html>
