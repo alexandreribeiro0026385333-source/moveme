@@ -273,6 +273,53 @@ app.post('/corridas/:id/aceitar', async (req, res) => {
   }
 });
 
+// NO SERVER.JS - Adicionar estas rotas para o chat:
+
+// GET mensagens do chat por corrida_id
+app.get('/chat/:corrida_id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM chat WHERE corrida_id = $1 ORDER BY created_at ASC',
+      [req.params.corrida_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST enviar mensagem
+app.post('/chat/enviar', async (req, res) => {
+  const { corrida_id, de_motorista, mensagem } = req.body;
+  
+  try {
+    await pool.query(
+      'INSERT INTO chat (corrida_id, de_motorista, mensagem, created_at) VALUES ($1, $2, $3, NOW())',
+      [corrida_id, de_motorista, mensagem]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET verificar novas mensagens (opcional - para atualização em tempo real)
+app.get('/chat/:corrida_id/novas/:ultima_msg_id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM chat WHERE corrida_id = $1 AND id > $2 ORDER BY created_at ASC',
+      [req.params.corrida_id, req.params.ultima_msg_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
 
 
 
