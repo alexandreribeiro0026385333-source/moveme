@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat - MOVEME</title>
+<style>
+  body { 
+    margin:0; 
+    font-family: Arial, sans-serif; 
+    background:#f4f4f4; 
+  }
+  .container { 
+    width:100%; 
+    max-width:500px; 
+    margin:auto; 
+    padding:20px; 
+  }
+  .login-section, .chat-section { 
+    background: white; 
+    padding: 20px; 
+    border-radius: 8px; 
+    margin-bottom: 15px; 
+  }
+  input, button { 
+    padding:10px; 
+    margin:8px 0; 
+    border-radius:4px; 
+    border:1px solid #bbb; 
+    box-sizing: border-box; 
+  }
+  button { 
+    background:#007bff; 
+    color:white; 
+    border:none; 
+    cursor: pointer;
+  }
+  button:hover { 
+    background:#0056b3; 
+  }
+  .logo {
+    text-align: center;
+    color: red;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+  #chatMessages {
+    height: 300px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin: 10px 0;
+    overflow-y: auto;
+    background: #f9f9f9;
+  }
+  .msg-motorista {
+    text-align: right;
+    background: #007bff;
+    color: white;
+    padding: 8px;
+    margin: 5px;
+    border-radius: 10px;
+    display: inline-block;
+    max-width: 80%;
+  }
+  .msg-passageiro {
+    text-align: left;
+    background: #28a745;
+    color: white;
+    padding: 8px;
+    margin: 5px;
+    border-radius: 10px;
+    display: inline-block;
+    max-width: 80%;
+  }
+  .chat-input {
+    display: flex;
+    gap: 5px;
+  }
+  .chat-input input {
+    flex: 1;
+  }
+  #avatarInput {
+    width: 100px;
+  }
+  #mensagemInput {
+    flex: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Logo -->
+  <div class="logo">MOVEME</div>
+
+  <!-- Login -->
+  <div class="login-section" id="loginSection">
+    <h2 style="text-align:center; margin-bottom:20px;">Login Chat</h2>
+    <input type="email" id="email" placeholder="Email" style="width:100%">
+    <input type="password" id="senha" placeholder="Senha" style="width:100%">
+    <button onclick="fazerLogin()" style="width:100%">🔑 Entrar no Chat</button>
+    <div id="msg"></div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-section" id="chatSection" style="display:none;">
+    <h3 style="text-align:center;">Chat da Corrida</h3>
+    
+    <div id="infoCorrida"></div>
+    
+    <div id="chatMessages"></div>
+    
+    <div class="chat-input">
+      <input type="text" id="avatarInput" placeholder="Seu nome">
+      <input type="text" id="mensagemInput" placeholder="Digite sua mensagem...">
+      <button onclick="enviarMensagem()" style="width:80px">📤</button>
+    </div>
+    
+    <button onclick="carregarMensagens()" style="background:#17a2b8; margin-top:10px; width:100%">🔄 Atualizar Chat</button>
+  </div>
+</div>
+
+<script>
+const API = "https://moveme-backend-v80p.onrender.com";
+let usuario = null;
+let corridaId = null;
+let userType = null;
+let userId = null;
+
+// ---- AO CARREGAR A PÁGINA ----
+window.onload = function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  corridaId = urlParams.get('corrida_id');
+  userType = urlParams.get('user_type');
+  userId = urlParams.get('user_id');
+  
+  if (!userId) {
+    userId = localStorage.getItem('user_id');
+    userType = localStorage.getItem('user_type');
+  }
+  
+  if (userId && userType && corridaId) {
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('chatSection').style.display = 'block';
+    carregarInfoCorrida();
+    carregarMensagens();
+  }
+};
+
+// ---- FUNÇÃO LOGIN ----
+function fazerLogin() {
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  const msg = document.getElementById("msg");
+
+  if (!email || !senha) {
+    mostrarMsg(msg, "❌ Digite email e senha", "erro");
+    return;
+  }
+
+  mostrarMsg(msg, "🟡 Verificando login...", "processando");
+
+  const endpoint = userType === 'motorista' ? '/motora' : '/bonecos';
+  
+  fetch(API + endpoint)
+    .then(res => res.json())
+    .then(dados => {
+      const user = dados.find(x => x.email === email && x.senha === senha);
+      
+      if (!user) {
+        mostrarMsg(msg, "❌ Login inválido", "erro");
+        return;
+      }
+
+      usuario = user;
+      mostrarMsg(msg, "✅ Logado com sucesso", "sucesso");
+      
+      localStorage.setItem('user_id', user.id);
+      localStorage.setItem('user_type', userType);
+      localStorage.setItem('user_nome', user.nome);
+      
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('chatSection').style.display = 'block';
+      
+      carregarInfoCorrida();
+      carregarMensagens();
+    })
+    .catch(e => {
+      mostrarMsg(msg, "❌ Erro de conexão", "erro");
+    });
+}
+
+// ---- CARREGAR INFORMAÇÕES DA CORRIDA ----
+function carregarInfoCorrida() {
+  if (!corridaId) return;
+  
+  const infoDiv = document.getElementById('infoCorrida');
+  infoDiv.innerHTML = `<p><strong>Corrida ID:</strong> ${corridaId}</p>`;
+}
+
+// ---- CARREGAR MENSAGENS ----
+function carregarMensagens() {
+  if (!corridaId) return;
+  
+  fetch(API + "/chat/" + corridaId)
+    .then(res => res.json())
+    .then(mensagens => {
+      const chatDiv = document.getElementById('chatMessages');
+      chatDiv.innerHTML = '';
+      
+      mensagens.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = msg._tipo === 'motorista' ? 'msg-motorista' : 'msg-passageiro';
+        div.innerHTML = `<strong>${msg.avatar}:</strong> ${msg.mensagem}`;
+        chatDiv.appendChild(div);
+      });
+      
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    })
+    .catch(e => {
+      console.error("Erro ao carregar mensagens:", e);
+    });
+}
+
+// ---- ENVIAR MENSAGEM ----
+function enviarMensagem() {
+  const avatarInput = document.getElementById('avatarInput');
+  const mensagemInput = document.getElementById('mensagemInput');
+  const avatar = avatarInput.value.trim();
+  const mensagem = mensagemInput.value.trim();
+  
+  if (!avatar) {
+    alert("Digite seu nome no chat");
+    return;
+  }
+  
+  if (!mensagem) {
+    alert("Digite uma mensagem");
+    return;
+  }
+  
+  if (!usuario || !corridaId) return;
+  
+  const _tipo = userType;
+  const _id = usuario.id;
+  const user_nome = usuario.nome;
+  
+  fetch(API + "/chat/enviar", {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      corrida_id: corridaId,
+      _tipo: _tipo,
+      _id: _id,
+      user_nome: user_nome,
+      avatar: avatar,
+      mensagem: mensagem
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    mensagemInput.value = '';
+    carregarMensagens();
+  })
+  .catch(e => {
+    console.error("Erro ao enviar mensagem:", e);
+  });
+}
+
+// ---- FUNÇÃO AUXILIAR ----
+function mostrarMsg(elemento, mensagem, tipo) {
+  elemento.innerHTML = mensagem;
+  elemento.style.color = tipo === 'erro' ? 'red' : tipo === 'sucesso' ? 'green' : 'orange';
+}
+
+// ---- ATUALIZAÇÃO AUTOMÁTICA ----
+setInterval(() => {
+  if (usuario && corridaId) {
+    carregarMensagens();
+  }
+}, 3000);
+</script>
+</body>
+</html>
