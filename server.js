@@ -275,6 +275,87 @@ app.get('/chat/:corrida_id/novas/:ultima_msg_id', async (req, res) => {
   }
 });
 
+
+// ROTA PARA CADASTRO DE VEÍCULOS
+app.post('/veiculos', async (req, res) => {
+  try {
+    const {
+      ano,
+      condutor_id,
+      cor,
+      placa,
+      renavam,
+      cpf,
+      tipo,
+      modelo,
+      condutor
+    } = req.body;
+
+    // Validação básica do tipo
+    const tiposPermitidos = ['carro', 'moto', 'caminhao', 'bike'];
+    if (tipo && !tiposPermitidos.includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo de veículo inválido' });
+    }
+
+    // Inserir no banco
+    const query = `
+      INSERT INTO veiculos 
+      (ano, condutor_id, cor, placa, renavam, cpf, tipo, modelo, condutor, created_at) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) 
+      RETURNING *
+    `;
+
+    const values = [
+      ano,
+      condutor_id,
+      cor,
+      placa,
+      renavam,
+      cpf,
+      tipo,
+      modelo,
+      condutor
+    ];
+
+    const result = await pool.query(query, values);
+
+    res.status(201).json({
+      success: true,
+      message: 'Veículo cadastrado com sucesso',
+      data: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erro ao cadastrar veículo:', error);
+    
+    // Tratar erros específicos do PostgreSQL
+    if (error.code === '23505') { // Unique violation
+      return res.status(400).json({ error: 'Placa ou RENAVAM já cadastrado' });
+    }
+    
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ROTA PARA LISTAR VEÍCULOS (opcional)
+app.get('/veiculos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM veiculos ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erro ao buscar veículos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+
+
+
+
+
 // ===================== ROTAS ATIVOS =====================
 app.get('/ativos', async (req, res) => {
   try {
