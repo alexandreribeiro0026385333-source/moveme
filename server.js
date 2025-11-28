@@ -351,7 +351,10 @@ app.get('/veiculos', async (req, res) => {
   }
 });
 
-
+// ANTES da rota /ativos, adicione:
+app.get('/veiculocad.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'veiculocad.html'));
+});
 
 
 
