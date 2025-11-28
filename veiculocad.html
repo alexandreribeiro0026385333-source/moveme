@@ -124,7 +124,7 @@ form.addEventListener('submit', async (e) => {
 
     try {
         // ATUALIZE COM SUA URL DO BACKEND
-const res = await fetch('https://moveme-backend-v80p.onrender.com/veiculocad', {
+const res = await fetch('https://moveme-backend-v80p.onrender.com/veiculos', {
                    method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
