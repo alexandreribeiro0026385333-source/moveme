@@ -277,6 +277,7 @@ app.get('/chat/:corrida_id/novas/:ultima_msg_id', async (req, res) => {
 
 
 // ROTA PARA CADASTRO DE VEÍCULOS
+// tabela veiculo veiculocad.html
 app.post('/veiculos', async (req, res) => {
   try {
     const {
@@ -299,7 +300,7 @@ app.post('/veiculos', async (req, res) => {
 
     // Inserir no banco
     const query = `
-      INSERT INTO veiculos 
+      INSERT INTO veiculo
       (ano, condutor_id, cor, placa, renavam, cpf, tipo, modelo, condutor, created_at) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) 
       RETURNING *
@@ -343,10 +344,10 @@ app.post('/veiculos', async (req, res) => {
 // ROTA PARA LISTAR VEÍCULOS (opcional)
 app.get('/veiculos', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM veiculos ORDER BY created_at DESC');
+    const result = await pool.query('SELECT * FROM veiculo ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (error) {
-    console.error('Erro ao buscar veículos:', error);
+    console.error('Erro ao buscar veículo:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
